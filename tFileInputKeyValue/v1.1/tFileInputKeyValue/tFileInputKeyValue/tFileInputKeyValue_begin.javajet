@@ -1,0 +1,81 @@
+<%@ jet
+imports="
+org.talend.core.model.process.EConnectionType
+org.talend.core.model.process.INode
+org.talend.core.model.process.ElementParameterParser
+org.talend.core.model.metadata.IMetadataTable
+org.talend.core.model.metadata.IMetadataColumn
+org.talend.core.model.process.IConnection
+org.talend.core.model.process.IConnectionCategory
+org.talend.designer.codegen.config.CodeGeneratorArgument
+org.talend.core.model.metadata.types.JavaTypesManager
+org.talend.core.model.metadata.types.JavaType
+java.util.List
+java.util.Map
+"
+%>
+<% 
+CodeGeneratorArgument codeGenArgument = (CodeGeneratorArgument) argument;
+INode node = (INode)codeGenArgument.getArgument();
+String cid = node.getUniqueName();
+
+String fileName = ElementParameterParser.getValue(node, "__FILENAME__");
+String rowSep = ElementParameterParser.getValue(node, "__ROW_SEPARATOR__");
+String header = ElementParameterParser.getValue(node, "__HEADER__");
+if(("").equals(header))
+{
+	header="0";
+}
+String limit = ElementParameterParser.getValue(node, "__LIMIT__");
+if(("").equals(limit))
+{
+	limit = "-1";
+}
+String footer = ElementParameterParser.getValue(node, "__FOOTER__");
+boolean uncompress = ("true").equals(ElementParameterParser.getValue(node,"__UNCOMPRESS__"));
+if(("").equals(footer))
+{
+	footer="0";
+}
+%>
+int nb_line_<%=cid %> = 0;
+int header_<%=cid %> = <%= header%>;
+int footer_<%=cid %> = <%= footer%>;
+int limit_<%=cid %> = <%= limit %>;
+int totalLine_<%=cid %> = 0;
+int lastLine_<%=cid %> = -1;
+int iterations_<%=cid %> = 0;
+String token_<%=cid %>=null;
+String line_<%=cid %>=null;
+String keyValue_<%=cid %>=null;
+java.util.Scanner scan0_<%=cid %>=null;
+java.util.Scanner scan_<%=cid %>=null;
+try
+{
+	if(footer_<%=cid %> >0)
+	{
+		scan0_<%=cid %>= new java.util.Scanner(new java.io.File(<%=fileName %> )).useDelimiter(<%=rowSep%>);
+		while(scan0_<%=cid %>.hasNext())								// To find the number of rows in the File
+		{
+			scan0_<%=cid %>.next();
+			totalLine_<%=cid %>++;
+		}
+		if(scan0_<%=cid %>!=null)
+			scan0_<%=cid %>.close();
+		lastLine_<%=cid %>=totalLine_<%=cid %>-footer_<%=cid %>;
+	}		
+		
+	scan_<%=cid %>= new java.util.Scanner(new java.io.File(<%=fileName %> )).useDelimiter(<%=rowSep%>);
+	while(scan_<%=cid %>.hasNext())
+		{
+			iterations_<%=cid %>++;
+			if(iterations_<%=cid %> <= header_<%=cid %>)
+			{
+				scan_<%=cid %>.next();
+				continue;
+			}
+			if((limit_<%=cid %> >=0 && (nb_line_<%=cid %>) >= limit_<%=cid %>))
+				break;
+			if((footer_<%=cid %> >0) && (iterations_<%=cid %> > lastLine_<%=cid %>))
+				break;
+			

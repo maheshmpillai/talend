@@ -1,0 +1,29 @@
+#
+#Mon Oct 08 16:12:46 IST 2012
+PROPERTYADVANCED.NAME=PROPERTYADVANCED
+NB_LINE.NAME=NB_LINE
+PROPERTY.NAME=PROPERTY
+HELP=org.talend.help.tInputFileParts
+LONG_NAME=Extracts contents from a file based on the tags/parts
+
+#ATTACHMENT_PATH.NAME=Attachment export directory
+#ATTACHMENT_OUTPUT_PATH.NAME=Attachment output directory
+ENCODING.NAME=Encoding
+FIELD_SEPERATOR.NAME=Field Seperator
+ROW_SEPERATOR.NAME=Row Seperator
+KEY_VALUE_SEPERATOR.NAME=Key-Value Seperator
+FILENAME.NAME=File Name
+FIRST_COLUMN.NAME=First column
+FOOTER.NAME=Footer
+HEADER.NAME=Header
+HELP=org.talend.help.tFileInputMail
+LAST_COLUMN.NAME=Last column
+LIMIT.NAME=Limit
+LONG_NAME=Extracts fields from an input email file. Operates with one input at a time
+FIELD_NAMES.ITEM.FIELD_NAME=Field Name
+FIELD_NAMES.ITEM.MULTI_VALUE=Multi Value
+FIELD_NAMES.ITEM.PART_SEPARATOR=Separator
+FIELD_NAMES.NAME=Field Name
+SHEETNAME.NAME=Sheetname
+DIE_ON_ERROR.NAME=Die on error
+EXPORTED_FILE_PATH.NAME=Exported File Path
