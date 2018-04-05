@@ -1,0 +1,288 @@
+<%@ jet
+imports="
+org.talend.core.model.process.EConnectionType
+org.talend.core.model.process.INode
+org.talend.core.model.process.ElementParameterParser
+org.talend.core.model.metadata.IMetadataTable
+org.talend.core.model.metadata.IMetadataColumn
+org.talend.core.model.process.IConnection
+org.talend.core.model.process.IConnectionCategory
+org.talend.designer.codegen.config.CodeGeneratorArgument
+org.talend.core.model.metadata.types.JavaTypesManager
+org.talend.core.model.metadata.types.JavaType
+java.util.List
+java.util.ArrayList
+java.util.Map
+"
+%>
+<% 
+CodeGeneratorArgument codeGenArgument = (CodeGeneratorArgument) argument;
+INode node = (INode)codeGenArgument.getArgument();
+String cid = node.getUniqueName();
+
+List<IMetadataTable> metadatas = node.getMetadataList();
+List<IMetadataColumn> columns;
+IMetadataColumn column;
+String targetConnName;
+
+String field = ElementParameterParser.getValue(node, "__FIELD__");
+String fieldSep = ElementParameterParser.getValue(node, "__FIELD_SEPARATOR__");
+String keyValueSep = ElementParameterParser.getValue(node, "__KEY_VALUE_SEPARATOR__");
+String dieOnErrorStr = ElementParameterParser.getValue(node, "__DIE_ON_ERROR__");
+	boolean dieOnError = (dieOnErrorStr!=null&&!("").equals(dieOnErrorStr))?("true").equals(dieOnErrorStr):false;
+List<Map<String, String>> keyNames = (List<Map<String,String>>)ElementParameterParser.getObjectValue(node,"__KEY_NAMES__");
+
+IConnection inConn =node.getIncomingConnections().get(0);
+IMetadataTable preMetadata = null;
+if ((node.getIncomingConnections()!=null)&&(node.getIncomingConnections().size()>0))
+	preMetadata = inConn.getMetadataTable();
+String inRowName = inConn.getName();
+List<IMetadataColumn> incolumns = preMetadata.getListColumns();
+//
+for (int i = 0; i < incolumns.size(); i++)
+{
+	 IMetadataColumn incolumn = incolumns.get(i);
+}
+
+if ((metadatas != null) && (metadatas.size() > 0)) 
+{//1
+	IMetadataTable metadata = metadatas.get(0);
+	if (metadata != null) 
+	{//2
+  		columns = metadata.getListColumns(); 
+		List< ? extends IConnection> outConns = node.getOutgoingConnections();
+		for (IConnection conn : outConns)
+		{ //3
+			if (conn.getLineStyle().equals(EConnectionType.FLOW_MAIN)||conn.getLineStyle().equals(EConnectionType.FLOW_MERGE))
+			{ //4
+		   		targetConnName = conn.getName();
+		   		short [] flag=new short[keyNames.size()];
+				%>
+				iterations_<%=cid %>++;
+	    		String [] keyName_<%=cid %> = new String [] 
+	    		{
+				<%
+					for (int i=0; i<keyNames.size(); i++) 
+					{
+					   Map<String, String> lineValue = keyNames.get(i);
+					   if(lineValue.get("KEY_NAME").equals(""))
+					   {
+					   flag[i]=1;
+				%>
+						   "",
+				<%	   }
+					   else
+					   {
+					   flag[i]=2;
+				%>			   
+					   	   <%= lineValue.get("KEY_NAME") %>,
+				<%
+					   }
+					}
+				%>
+				};
+				<%
+				List<IMetadataColumn> newColumnList = new ArrayList<IMetadataColumn>();
+				IMetadataTable inputMetadataTable = inConn.getMetadataTable();
+				IMetadataTable outputMetadataTable = conn.getMetadataTable();
+				%>
+				<%=targetConnName %> = new <%=targetConnName %>Struct();
+				<%
+				int i=0;
+				for (IMetadataColumn outputCol : outputMetadataTable.getListColumns()) 
+				{
+					for (IMetadataColumn inputCol : inputMetadataTable.getListColumns()) 
+					{
+						if( outputCol.getLabel().equals( inputCol.getLabel()))
+						{
+							if(flag[i]!=2)
+								flag[i]=0;
+							%>
+							<%=conn.getName()%>.<%=outputCol.getLabel()%> = <%=inConn.getName()%>.<%=inputCol.getLabel()%> ;
+							<%
+							break;
+						}
+					}
+					i++;
+				}
+				%>
+				String [] trim_<%=cid %> = new String [] 
+				{
+				<%
+					for (i=0; i<keyNames.size(); i++) 
+					{
+					    Map<String, String> lineValue = keyNames.get(i);
+					%>
+						"<%= lineValue.get("TRIM") %>",
+					<%
+					}
+				%>
+				};
+				
+				String [] tempValues_<%=cid %> = new String [<%= columns.size()%>];
+				String pattern_<%=cid %>;
+				String [] sep_<%=cid %>;
+			
+				inputField_<%=cid %>=<%=inRowName%>.<%=field%>;
+				String [] st_<%=cid %>=inputField_<%=cid %>.split(<%=fieldSep%>);
+				for (int i = 0; i < st_<%=cid %>.length; i++)
+				{
+					for (int j=0; j<keyName_<%=cid %>.length;j++)
+					{
+						pattern_<%=cid %>="(?s)^"+keyName_<%=cid %>[j]+<%=keyValueSep%>;
+						if(st_<%=cid %>[i].matches(pattern_<%=cid %>+".*"))
+						{
+							sep_<%=cid %>=st_<%=cid %>[i].split(pattern_<%=cid %>);
+							if(sep_<%=cid %>.length>1)
+							if(("true").equals(trim_<%=cid %>[j]))
+							{
+								tempValues_<%=cid %>[j]=(sep_<%=cid %>.length<2)?null:(sep_<%=cid %>[1].trim());
+							}
+							else
+							{
+								tempValues_<%=cid %>[j]=(sep_<%=cid %>.length<2)?null:sep_<%=cid %>[1];
+							}
+						}
+					}
+			    	       
+				}
+				<%
+				for (i = 0; i < columns.size(); i++)
+				{//5
+			    
+			    	column = columns.get(i);
+			    	String ttg = JavaTypesManager.getTypeToGenerate(column.getTalendType(),column.isNullable());
+			    	String patternValue = column.getPattern() == null || column.getPattern().trim().length() == 0 ? null : column.getPattern();
+			       	if(flag[i]==0)
+			    		continue;
+			    	else if(flag[i]==1)
+				    {
+					   	%>
+					   	try
+		    			{
+							<%
+							String defaultValue = JavaTypesManager.getDefaultValueFromJavaType(ttg, column.getDefault());
+							
+							if(defaultValue == null) 
+							{
+							%>
+								throw new RuntimeException("Value is empty for column : '<%= column.getLabel() %>' in '<%=targetConnName%>' connection, value is invalid or this column should be nullable or have a default value.");
+						   	<%
+							}
+							else 
+							{
+								if(ttg.equals("String"))
+								{
+									defaultValue=(column.getDefault()==null)?"\"\"":column.getDefault();
+								}
+							%>
+								<%=targetConnName %>.<%=column.getLabel() %> = <%=defaultValue %>;
+							<%
+							}
+							%>
+						}
+						catch(Exception e) 
+						{
+							<% 
+							if(dieOnError) 
+							{
+							%>
+								throw e;
+								<% 
+							}
+							else 
+							{
+							%>
+								System.err.println(e.getMessage()+" - Line: Hai" + (iterations_<%=cid %>));
+								<%
+							}
+							%>
+						}							
+						<%
+						continue;
+					}	
+					%>
+					try
+					{
+					    if(tempValues_<%=cid %>[<%=i%>]!=null) 
+						{
+							<%
+						   	if (ttg.equals("String") || ttg.equals("Object"))
+						   	{ 
+						   	%>
+						   		<%=targetConnName %>.<%=column.getLabel() %> = tempValues_<%=cid %>[<%=i%>];
+						   	<%
+							}
+							else if (ttg.equals("byte[]"))
+						   	{
+							%>
+						   		<%=targetConnName %>.<%=column.getLabel() %> =tempValues_<%=cid %>[<%=i%>].getBytes();
+						   	<%
+						   	} 
+						   	else if (ttg.equals("java.util.Date"))
+						   	{ 
+							%>
+						   		<%=targetConnName %>.<%=column.getLabel() %> = ParserUtils.parseTo_Date(tempValues_<%=cid %>[<%=i%>], <%= patternValue %>);
+						   	<%
+						   	} 
+						   	else if (JavaTypesManager.isNumberType(JavaTypesManager.getJavaTypeFromId(column.getTalendType())))
+						   	{ 
+							%>
+						   		<%=targetConnName %>.<%=column.getLabel() %> = ParserUtils.parseTo_<%= ttg %>(tempValues_<%=cid %>[<%=i%>]);
+						   	<%
+						   	} 
+						   	else 
+							{ 
+							%>
+								<%=targetConnName %>.<%=column.getLabel() %> = ParserUtils.parseTo_<%= ttg %>(tempValues_<%=cid %>[<%=i%>]);
+							<%
+							}
+						%>
+						}
+						else
+						{
+							<%
+							String defaultValue = JavaTypesManager.getDefaultValueFromJavaType(ttg, column.getDefault());
+							
+							if(defaultValue == null) 
+							{
+							%>
+								throw new RuntimeException("Value is empty for column : '<%= column.getLabel() %>' in '<%=targetConnName%>' connection, value is invalid or this column should be nullable or have a default value.");
+							<%
+							}
+							else 
+							{
+								if(ttg.equals("String"))
+								{
+									defaultValue=(column.getDefault()==null)?"\"\"":column.getDefault();
+								}
+							%>
+								<%=targetConnName %>.<%=column.getLabel() %> = <%=defaultValue %>;
+								<%
+							}
+							%>
+						}
+				 	}
+					catch(Exception e) 
+					{
+						<% if(dieOnError) 
+						{%>
+							throw e;
+						<% 
+						}
+						else 
+						{ %>
+							System.err.println(e.getMessage()+" - Line: " + (iterations_<%=cid %>));
+							continue;
+							<%
+						}
+						%>
+					}					    
+					<% 	
+		    	}//5
+		    }//4
+		}//3
+	}//2
+}//1
+%>
+nb_line_<%=cid %>++;
