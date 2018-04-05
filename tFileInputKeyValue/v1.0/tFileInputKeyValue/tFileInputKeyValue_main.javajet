@@ -1,0 +1,196 @@
+<%@ jet
+imports="
+org.talend.core.model.process.EConnectionType
+org.talend.core.model.process.INode
+org.talend.core.model.process.ElementParameterParser
+org.talend.core.model.metadata.IMetadataTable
+org.talend.core.model.metadata.IMetadataColumn
+org.talend.core.model.process.IConnection
+org.talend.core.model.process.IConnectionCategory
+org.talend.designer.codegen.config.CodeGeneratorArgument
+org.talend.core.model.metadata.types.JavaTypesManager
+org.talend.core.model.metadata.types.JavaType
+java.util.List
+java.util.Map
+"
+%>
+<% 
+CodeGeneratorArgument codeGenArgument = (CodeGeneratorArgument) argument;
+INode node = (INode)codeGenArgument.getArgument();
+String cid = node.getUniqueName();
+
+List<IMetadataTable> metadatas = node.getMetadataList();
+List<IMetadataColumn> columns;
+IMetadataColumn column;
+String targetConnName;
+
+String fieldSep = ElementParameterParser.getValue(node, "__FIELD_SEPARATOR__");
+String keyValueSep = ElementParameterParser.getValue(node, "__KEY_VALUE_SEPARATOR__");
+String dieOnErrorStr = ElementParameterParser.getValue(node, "__DIE_ON_ERROR__");
+	boolean dieOnError = (dieOnErrorStr!=null&&!("").equals(dieOnErrorStr))?("true").equals(dieOnErrorStr):false;
+List<Map<String, String>> keyNames = (List<Map<String,String>>)ElementParameterParser.getObjectValue(node,"__KEY_NAMES__");
+if ((metadatas != null) && (metadatas.size() > 0)) 
+{//1
+	IMetadataTable metadata = metadatas.get(0);
+	if (metadata != null) 
+	{//2
+  		columns = metadata.getListColumns(); 
+		List< ? extends IConnection> outConns = node.getOutgoingConnections();
+		for (IConnection conn : outConns)
+		{ //3
+			if (conn.getLineStyle().equals(EConnectionType.FLOW_MAIN)||conn.getLineStyle().equals(EConnectionType.FLOW_MERGE))
+			{ //4
+		   		targetConnName = conn.getName();
+				%>
+	    		String [] keyName_<%=cid %> = new String [] 
+	    		{
+				<%
+					for (int i=0; i<keyNames.size(); i++) 
+					{
+					   Map<String, String> lineValue = keyNames.get(i);
+				%>
+					 	<%= lineValue.get("KEY_NAME") %>,
+				<%
+					}
+				%>
+				};
+				String [] trim_<%=cid %> = new String [] 
+				{
+				<%
+					for (int i=0; i<keyNames.size(); i++) 
+					{
+					    Map<String, String> lineValue = keyNames.get(i);
+					%>
+						"<%= lineValue.get("TRIM") %>",
+					<%
+					}
+				%>
+				};
+				String [] tempValues_<%=cid %> = new String [<%= columns.size()%>];
+			
+				<%
+				if(fieldSep.equals("\"\""))
+				{
+					fieldSep=keyValueSep;
+				}
+				%>
+				line_<%=cid %>=scan_<%=cid %>.next().replaceAll(<%=fieldSep%>,<%=keyValueSep%>);						<%//Replace the key-value seperator with field seperator.This is done so as to make all seperators the same%>
+				String [] st_<%=cid %>=line_<%=cid %>.split(<%=keyValueSep%>);
+				
+				for (int i = 0; i < st_<%=cid %>.length; i++)
+				{
+					for (int j=0; j<keyName_<%=cid %>.length;j++)
+					{
+						if(st_<%=cid %>[i].equals(keyName_<%=cid %>[j]))
+						{
+							if(st_<%=cid %>.length > (i+1))
+							{
+								if(("true").equals(trim_<%=cid %>[j]))
+								{
+									tempValues_<%=cid %>[j]=(st_<%=cid %>[i+1].equals(""))?null:st_<%=cid %>[++i].trim();
+								}
+								else
+								{
+									tempValues_<%=cid %>[j]=(st_<%=cid %>[i+1].equals(""))?null:st_<%=cid %>[++i];
+								}
+							}
+							else
+								tempValues_<%=cid %>[j]=null;
+							
+						}
+					}
+			    	       
+				}
+				String temp;
+			    <%
+				for (int i = 0; i < columns.size(); i++)
+			    {//5
+			    	column = columns.get(i);
+			    	String ttg = JavaTypesManager.getTypeToGenerate(column.getTalendType(),column.isNullable());
+			    	String patternValue = column.getPattern() == null || column.getPattern().trim().length() == 0 ? null : column.getPattern();
+			    	%>
+		    		try
+		    		{
+		    		   	temp=tempValues_<%=cid %>[<%=i%>];
+				    	if(temp!=null) 
+						{
+							<%
+					       	if (ttg.equals("String") || ttg.equals("Object"))
+					    	{ 
+					    	%>
+					    		<%=targetConnName %>.<%=column.getLabel() %> = temp;
+					    	<%
+							}
+							else if (ttg.equals("byte[]"))
+					    	{
+							%>
+					    		<%=targetConnName %>.<%=column.getLabel() %> =temp.getBytes();
+					    	<%
+					    	} 
+					    	else if (ttg.equals("java.util.Date"))
+					    	{ 
+							%>
+					    		<%=targetConnName %>.<%=column.getLabel() %> = ParserUtils.parseTo_Date(temp, <%= patternValue %>);
+					    	<%
+					    	} 
+					    	else if (JavaTypesManager.isNumberType(JavaTypesManager.getJavaTypeFromId(column.getTalendType())))
+					    	{ 
+							%>
+					    		<%=targetConnName %>.<%=column.getLabel() %> = ParserUtils.parseTo_<%= ttg %>(temp);
+					    	<%
+					    	} 
+					    	else 
+							{ 
+							%>
+								<%=targetConnName %>.<%=column.getLabel() %> = ParserUtils.parseTo_<%= ttg %>(temp);
+							<%
+							}
+						%>
+					    }
+					    else
+					    {
+							<%
+							String defaultValue = JavaTypesManager.getDefaultValueFromJavaType(ttg, column.getDefault());
+							
+							if(defaultValue == null) 
+							{
+							%>
+								throw new RuntimeException("Value is empty for column : '<%= column.getLabel() %>' in '<%=targetConnName%>' connection, value is invalid or this column should be nullable or have a default value.");
+							<%
+							}
+							else 
+							{
+								if(ttg.equals("String"))
+								{
+									defaultValue=(column.getDefault()==null)?"\"\"":column.getDefault();
+								}
+							%>
+								<%=targetConnName %>.<%=column.getLabel() %> = <%=defaultValue %>;
+							<%
+							}
+							%>
+					    }
+					}
+					catch(Exception e) 
+					{
+						<% if(dieOnError) 
+						{%>
+							throw e;
+						<% 
+						}
+						else 
+						{ %>
+							System.err.println(e.getMessage()+" - Line: " + (iterations_<%=cid %>-header_<%=cid %>));
+							continue;
+							<%
+						}
+						%>
+					}					    
+				<% 	
+		    	}//5
+		    }//4
+		}//3
+	}//2
+}//1
+%>
+nb_line_<%=cid %>++;
